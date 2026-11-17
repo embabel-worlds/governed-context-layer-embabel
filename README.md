@@ -1,13 +1,16 @@
 # Chai & Co. on Embabel Worlds
 
-`realm-chai` gives an Embabel World governed, read-only access to the Chai & Co. franchise
-database from Google's governed-context-layer demo
-([rominirani/governed-context-layer-gcp](https://github.com/rominirani/governed-context-layer-gcp)).
-It reads the **same Cloud SQL database** and the **same Knowledge Catalog rules** as that
-demo, so both stacks can be asked the same questions over the same rows (see
-[PROBES.md](PROBES.md)).
+A port of Google's governed-context-layer demo
+([rominirani/governed-context-layer-gcp](https://github.com/rominirani/governed-context-layer-gcp))
+to Embabel Worlds. The realm `realm-chai` gives an Embabel World governed, read-only access to
+the Chai & Co. franchise database. The data stays in the demo's **Cloud SQL database** and the
+business rules stay in its **Knowledge Catalog**; the agent reaches the rows only through the
+realm. [PROBES.md](PROBES.md) has the questions that check the port, with their expected
+answers.
 
-| Google Cloud demo | This realm |
+What the port changes:
+
+| In Google's demo | In the port |
 |---|---|
 | MCP Toolbox connects as `postgres` | `chai_reader`: SELECT on named columns only, read-only by default (`db/setup.sql`) |
 | Knowledge Catalog overviews hold the business rules | **the same catalog**, read by the agent through the same MCP server; the realm's descriptions point to the entries |
@@ -27,16 +30,16 @@ demo, so both stacks can be asked the same questions over the same rows (see
 | `scripts/configure.ps1`, `scripts/configure.sh` | render the realm and the Claude Code session folders from your `.env` |
 | `scripts/embabel-headers.*`, `scripts/kc-headers.*` | Claude Code `headersHelper`s: read tokens at call time, so none sit in `.mcp.json` |
 | `.env.example` | template for your `.env` |
-| `PROBES.md` | the comparison questions, how to run them, and the expected answers |
+| `PROBES.md` | the questions that check the port, how to run them, and the expected answers |
 
 Made on your machine and gitignored: `.env` (your settings and secrets), `realms/realm-chai/`
 (the rendered realm the appliance mounts), `sessions/` (one folder per Claude Code session,
 each holding only a `.mcp.json`), the Cloud SQL Auth Proxy binary, and `local/` for your own
 notes.
 
-**Keep the comparison out of the realm.** The appliance's code door has a `realm_read` tool
+**Keep expected answers out of the realm.** The appliance's code door has a `realm_read` tool
 that returns any file in an installed realm, comments included. Expected answers or notes
-about the test inside `realm-chai/` will reach the agent being tested.
+about the probes inside `realm-chai/` will reach the agent being tested.
 
 ## Before you start
 
