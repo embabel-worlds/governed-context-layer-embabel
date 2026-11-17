@@ -1,0 +1,22 @@
+# The datasource this realm reads: the Chai & Co. Cloud SQL database, reached through the
+# Cloud SQL Auth Proxy running on the host, from inside the appliance's container.
+# `host.docker.internal` is the host as Docker Desktop names it; the appliance's compose file
+# maps the same name on Linux.
+#
+# READ-ONLY THREE WAYS, as realm-au-donations does it:
+#   1. No `readOnly: false` here — the platform refuses every write path.
+#   2. The read path sets the JDBC session read-only; chai_reader also defaults to
+#      default_transaction_read_only = on.
+#   3. chai_reader holds SELECT on named columns only — no grant on customers, tea_inventory
+#      or restock_requests at all. The credential cannot write, or read PII, whatever asks.
+#
+# The password comes from the server's environment: on the appliance, a line in secrets.env
+# beside its compose file. Server builds up to at least 2026-11-02 read this file and that
+# variable. The realm spec describes later builds that refuse this file and approve database
+# targets through the console's Connect screen instead (HOSTED_EXECUTION.md, "Approved SQL
+# callers"); on one of those, approve a PostgreSQL target with the same URL and user, and
+# replace `datasource: chai_and_co` in producers/chai.yml with the target ID it gives you.
+- name: chai_and_co
+  jdbcUrl: "jdbc:postgresql://host.docker.internal:${CHAI_PROXY_PORT}/chai_and_co"
+  username: chai_reader
+  passwordEnv: CHAI_READER_PASSWORD

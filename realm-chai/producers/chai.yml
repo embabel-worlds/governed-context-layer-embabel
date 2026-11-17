@@ -1,0 +1,143 @@
+# Governed sql producers over Cloud SQL chai_and_co. No authored SQL anywhere: each SELECT is
+# generated from `table` + `keyColumn`/`scan` + the `expose:` list, so governance compiles into
+# the statement and an unexposed column never leaves the database.
+#
+# mode: governed throughout — a label or column not listed under `expose:` does not exist for
+# any caller, and a query that names one is refused rather than answered empty. The expose
+# lists match the column grants on the database role the datasource logs in as, so the realm
+# and the database enforce the same boundary twice.
+#
+# Short TTL caches: this is operational data, so a change in the database shows within a
+# minute.
+
+# ── Stores ────────────────────────────────────────────────────────────────────────────────────
+
+- name: chaiStoresScan
+  kind: sql
+  datasource: chai_and_co
+  table: stores
+  dialect: postgresql
+  echoKeyAs: by
+  scan:
+    orderBy: store_id
+    descending: false
+    limit: 100
+  governance:
+    mode: governed
+    caps: { maxRows: 100 }
+    expose:
+      stores:
+        properties: [store_id, store_name, city, manager_name, daily_target_usd]
+  cache: { kind: ttl, seconds: 60 }
+
+- name: chaiStoresById
+  kind: sql
+  datasource: chai_and_co
+  table: stores
+  keyColumn: store_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    expose:
+      stores:
+        properties: [store_id, store_name, city, manager_name, daily_target_usd]
+  cache: { kind: ttl, seconds: 60 }
+
+# ── Orders ────────────────────────────────────────────────────────────────────────────────────
+# delivery_note is not exposed (and not granted): free text, which can carry personal details.
+
+- name: chaiOrdersByStoreId
+  kind: sql
+  datasource: chai_and_co
+  table: orders
+  keyColumn: store_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    caps: { maxRows: 5000 }
+    expose:
+      orders:
+        properties: [order_id, store_id, customer_id, order_timestamp, status,
+                     gross_amount_usd, discount_usd, tax_usd]
+  cache: { kind: ttl, seconds: 60 }
+
+# ── Customers ─────────────────────────────────────────────────────────────────────────────────
+# Reads the customer_profiles DATABASE VIEW, never the customers table: the display name is
+# computed in Postgres, and email, phone, address and full name are not in the view at all.
+
+- name: chaiCustomersById
+  kind: sql
+  datasource: chai_and_co
+  table: customer_profiles
+  keyColumn: customer_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    expose:
+      customer_profiles:
+        properties: [customer_id, display_name, loyalty_tier, loyalty_points]
+  cache: { kind: ttl, seconds: 60 }
+
+# ── Inventory ─────────────────────────────────────────────────────────────────────────────────
+# Reads the store_inventory DATABASE VIEW: one identity per line, no supplier_cost_usd.
+
+- name: chaiInventoryByStoreId
+  kind: sql
+  datasource: chai_and_co
+  table: store_inventory
+  keyColumn: store_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    expose:
+      store_inventory:
+        properties: [item_key, store_id, sku_id, item_name, unit, stock_on_hand,
+                     reorder_threshold, supplier_id]
+  cache: { kind: ttl, seconds: 60 }
+
+- name: chaiInventoryBySupplierId
+  kind: sql
+  datasource: chai_and_co
+  table: store_inventory
+  keyColumn: supplier_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    expose:
+      store_inventory:
+        properties: [item_key, store_id, sku_id, item_name, unit, stock_on_hand,
+                     reorder_threshold, supplier_id]
+  cache: { kind: ttl, seconds: 60 }
+
+# ── Suppliers ─────────────────────────────────────────────────────────────────────────────────
+
+- name: chaiSuppliersScan
+  kind: sql
+  datasource: chai_and_co
+  table: suppliers
+  dialect: postgresql
+  echoKeyAs: by
+  scan:
+    orderBy: supplier_id
+    descending: false
+    limit: 100
+  governance:
+    mode: governed
+    caps: { maxRows: 100 }
+    expose:
+      suppliers:
+        properties: [supplier_id, supplier_name, origin_region, shipment_status]
+  cache: { kind: ttl, seconds: 60 }
+
+- name: chaiSuppliersById
+  kind: sql
+  datasource: chai_and_co
+  table: suppliers
+  keyColumn: supplier_id
+  dialect: postgresql
+  governance:
+    mode: governed
+    expose:
+      suppliers:
+        properties: [supplier_id, supplier_name, origin_region, shipment_status]
+  cache: { kind: ttl, seconds: 60 }

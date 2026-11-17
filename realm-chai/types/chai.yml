@@ -1,0 +1,158 @@
+# Chai & Co. labels: the franchise's Cloud SQL tables as graph types, in the shape the
+# platform's schema miner produces: one type per table or database view, identity on the
+# primary key, one virtual join per foreign key. Nothing is stored in the world; every label
+# is fetched from Cloud SQL when a query reaches it.
+#
+# Descriptions here are PLAIN on purpose: what each column holds, nothing about how to use it.
+# The business rules (how Net Store Revenue is calculated, which customer columns are personal
+# data) live in ONE place, Google Cloud Knowledge Catalog, on each table's Cloud SQL entry.
+# Descriptions name the entry rather than restate the rule, so the two cannot drift apart.
+#
+# What is ENFORCED is not text at all: the column lists in producers/chai.yml and the grants on
+# the database role the datasource logs in as.
+#
+# Labels carry a `Chai` prefix so they cannot collide with Store/Order/Customer from other
+# realms installed in the same world (Odoo, Stripe, HubSpot).
+
+- name: ChaiFranchise
+  visibility: internal
+  description: >-
+    The pinned door into the franchise's tables, for the questions that start from "all of
+    them". Pin `by` to the column a scan orders by:
+    `(:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)` lists every store;
+    `(:ChaiFranchise {by:'supplier_id'})-[:SUPPLIER]->(sup:ChaiSupplier)` lists every supplier.
+  properties:
+    by:
+      metadata: { identity: "true" }
+
+- name: ChaiStore
+  description: >-
+    A Chai & Co. outlet, from the stores table of Cloud SQL chai_and_co. Knowledge Catalog
+    entry: projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/entryGroups/@cloudsql/entries/cloudsql.googleapis.com/projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/instances/${CHAI_INSTANCE}/databases/chai_and_co/schemas/public/tables/stores
+  properties:
+    store_id:
+      metadata: { identity: "true" }
+    store_name: "Outlet name."
+    city:
+      description: "The outlet's city."
+      values: { source: distinct }
+    manager_name: "The store manager's name."
+    daily_target_usd: "Daily revenue target, USD."
+  virtualJoins:
+    - anchorLabel: ChaiFranchise
+      relationship: STORE
+      keyField: by
+      recordKeyField: by
+      producer: chaiStoresScan
+      description: "Every store: `(:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)`."
+    - anchorLabel: ChaiInventoryItem
+      relationship: AT_STORE
+      keyField: store_id
+      recordKeyField: store_id
+      producer: chaiStoresById
+      description: "The store an inventory line belongs to: `(i:ChaiInventoryItem)-[:AT_STORE]->(s:ChaiStore)`."
+
+- name: ChaiOrder
+  description: >-
+    One customer order at one store, from the orders table of Cloud SQL chai_and_co. The
+    business rules for orders, including how Net Store Revenue is calculated, are in Google
+    Cloud Knowledge Catalog, in the overview of the entry
+    projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/entryGroups/@cloudsql/entries/cloudsql.googleapis.com/projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/instances/${CHAI_INSTANCE}/databases/chai_and_co/schemas/public/tables/orders
+  properties:
+    order_id:
+      metadata: { identity: "true" }
+    store_id: "FK to the ChaiStore."
+    customer_id: "FK to the ChaiCustomer."
+    order_timestamp: "When the order was placed, with time zone."
+    status:
+      description: "COMPLETED, REFUNDED or CANCELLED."
+      values: { source: distinct }
+    gross_amount_usd: "Order amount before discount, USD."
+    discount_usd: "Discount, USD."
+    tax_usd: "Tax, USD."
+  virtualJoins:
+    - anchorLabel: ChaiStore
+      relationship: HAS_ORDER
+      keyField: store_id
+      recordKeyField: store_id
+      producer: chaiOrdersByStoreId
+      description: "A store's orders: `(s:ChaiStore)-[:HAS_ORDER]->(o:ChaiOrder)`."
+
+- name: ChaiCustomer
+  description: >-
+    A loyalty-programme member, from the database view customer_profiles over the customers
+    table of Cloud SQL chai_and_co. The rules for customer data are in Google Cloud Knowledge
+    Catalog, in the overview of the entry
+    projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/entryGroups/@cloudsql/entries/cloudsql.googleapis.com/projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/instances/${CHAI_INSTANCE}/databases/chai_and_co/schemas/public/tables/customers
+  properties:
+    customer_id:
+      metadata: { identity: "true" }
+    display_name: "First name and last initial."
+    loyalty_tier:
+      description: "BRONZE, SILVER or GOLD."
+      values: { source: distinct }
+    loyalty_points: "Loyalty points balance."
+  virtualJoins:
+    - anchorLabel: ChaiOrder
+      relationship: PLACED_BY
+      keyField: customer_id
+      recordKeyField: customer_id
+      producer: chaiCustomersById
+      description: "Who placed an order: `(o:ChaiOrder)-[:PLACED_BY]->(c:ChaiCustomer)`."
+
+- name: ChaiInventoryItem
+  description: >-
+    One store's stock line for one tea or spice SKU, from the database view store_inventory
+    over the tea_inventory table of Cloud SQL chai_and_co. Knowledge Catalog entry:
+    projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/entryGroups/@cloudsql/entries/cloudsql.googleapis.com/projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/instances/${CHAI_INSTANCE}/databases/chai_and_co/schemas/public/tables/tea_inventory
+  properties:
+    item_key:
+      description: "store_id and sku_id joined by ':'."
+      metadata: { identity: "true" }
+    store_id: "FK to the ChaiStore."
+    sku_id: "SKU, e.g. 'sku-assam-ctc'. One SKU appears at several stores."
+    item_name: "Product name."
+    unit: "kg, liters or boxes."
+    stock_on_hand: "Current stock, in `unit`."
+    reorder_threshold: "Reorder level, in `unit`."
+    supplier_id: "FK to the ChaiSupplier."
+  virtualJoins:
+    - anchorLabel: ChaiStore
+      relationship: STOCKS
+      keyField: store_id
+      recordKeyField: store_id
+      producer: chaiInventoryByStoreId
+      description: "A store's stock lines: `(s:ChaiStore)-[:STOCKS]->(i:ChaiInventoryItem)`."
+    - anchorLabel: ChaiSupplier
+      relationship: SUPPLIES
+      keyField: supplier_id
+      recordKeyField: supplier_id
+      producer: chaiInventoryBySupplierId
+      description: "Every stock line a supplier provides, at any store: `(sup:ChaiSupplier)-[:SUPPLIES]->(i:ChaiInventoryItem)`."
+
+- name: ChaiSupplier
+  description: >-
+    A tea estate or spice supplier, from the suppliers table of Cloud SQL chai_and_co.
+    Knowledge Catalog entry:
+    projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/entryGroups/@cloudsql/entries/cloudsql.googleapis.com/projects/${CHAI_PROJECT_ID}/locations/${CHAI_REGION}/instances/${CHAI_INSTANCE}/databases/chai_and_co/schemas/public/tables/suppliers
+  properties:
+    supplier_id:
+      metadata: { identity: "true" }
+    supplier_name: "Supplier name."
+    origin_region: "Where the supplier is, e.g. Assam, Kerala, West Bengal."
+    shipment_status:
+      description: "ON_TIME or DELAYED_MONSOON_FREIGHT."
+      values: { source: distinct }
+  virtualJoins:
+    - anchorLabel: ChaiFranchise
+      relationship: SUPPLIER
+      keyField: by
+      recordKeyField: by
+      producer: chaiSuppliersScan
+      description: "Every supplier: `(:ChaiFranchise {by:'supplier_id'})-[:SUPPLIER]->(sup:ChaiSupplier)`."
+    - anchorLabel: ChaiInventoryItem
+      relationship: SUPPLIED_BY
+      keyField: supplier_id
+      recordKeyField: supplier_id
+      producer: chaiSuppliersById
+      description: "Who supplies a stock line: `(i:ChaiInventoryItem)-[:SUPPLIED_BY]->(sup:ChaiSupplier)`."

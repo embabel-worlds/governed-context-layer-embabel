@@ -1,0 +1,18 @@
+name: chai
+description: >-
+  Chai & Co. franchise operations — stores, orders, loyalty customers, tea and spice inventory,
+  suppliers — read live from Cloud SQL (instance ${CHAI_INSTANCE}, project ${CHAI_PROJECT_ID},
+  database chai_and_co). Read-only and governed at the producer: every SELECT is generated from
+  an explicit column list, the datasource connects as a SELECT-only role with column-level
+  grants, and two database views keep customer contact details and wholesale costs inside
+  Postgres. The business rules for this data are in Google Cloud Knowledge Catalog, on the
+  Cloud SQL entries for these tables. Net Store Revenue, low stock, VIP orders and delayed
+  supplier impact are saved views; anything else is composed from the same governed labels.
+version: "0.1.0"
+maturity: experimental
+tags:
+  - sql
+  - postgres
+  - cloud-sql
+  - retail
+  - governed

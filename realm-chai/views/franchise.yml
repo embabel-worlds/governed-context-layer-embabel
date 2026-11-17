@@ -1,0 +1,108 @@
+# Saved views over the Chai & Co. labels: revenue per store, low stock, VIP orders, and the
+# supply-chain question of which delayed suppliers affect which stores and customers.
+#
+# Every parameter has a default, so each view runs bare, is listed in the console, and is a
+# table through the SQL door (port 11052 by default). These are the realm's ANSWERS; they are not its
+# boundary. The boundary is the producers' expose lists: a question none of these views
+# anticipates is composed from the same governed labels and cannot reach past them.
+#
+# Descriptions say WHAT each view answers. The rule a view implements is stated once, in
+# Google Cloud Knowledge Catalog; the Cypher below is that rule as it runs. If the rule in
+# the catalog changes, the Cypher here has to change with it — that is the one link a person
+# still has to keep.
+
+- name: StoreNetRevenue
+  description: >-
+    Net Store Revenue per store, with completed and excluded order counts and the store's
+    daily target, computed by the formula in Knowledge Catalog on chai_and_co.public.orders.
+  params:
+    city:
+      type: string
+      description: "City name ('Mumbai', 'Bengaluru', 'Delhi'), or 'ALL' for every store."
+      default: "ALL"
+  cypher: |
+    MATCH (:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)
+    WHERE $city = 'ALL' OR toLower(s.city) = toLower($city)
+    OPTIONAL MATCH (s)-[:HAS_ORDER]->(o:ChaiOrder)
+    WITH s,
+         sum(CASE WHEN o.status = 'COMPLETED' THEN o.gross_amount_usd - o.discount_usd ELSE 0 END) AS net,
+         sum(CASE WHEN o.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+         sum(CASE WHEN o.status IN ['REFUNDED', 'CANCELLED'] THEN 1 ELSE 0 END) AS excluded
+    RETURN s.store_id                  AS store_id,
+           s.store_name                AS store_name,
+           s.city                      AS city,
+           round(100.0 * net) / 100.0  AS net_revenue_usd,
+           completed                   AS completed_orders,
+           excluded                    AS excluded_orders,
+           s.daily_target_usd          AS daily_target_usd
+    ORDER BY net_revenue_usd DESC
+
+- name: LowStockAlerts
+  description: "Stock lines at or below their reorder threshold, with the shortage."
+  params:
+    storeId:
+      type: string
+      description: "A store_id such as 'store-mum-01', or 'ALL' for every store."
+      default: "ALL"
+  cypher: |
+    MATCH (:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)-[:STOCKS]->(i:ChaiInventoryItem)
+    WHERE i.stock_on_hand <= i.reorder_threshold
+      AND ($storeId = 'ALL' OR s.store_id = $storeId)
+    RETURN s.store_id                               AS store_id,
+           s.store_name                             AS store_name,
+           s.city                                   AS city,
+           i.sku_id                                 AS sku_id,
+           i.item_name                              AS item_name,
+           i.unit                                   AS unit,
+           i.stock_on_hand                          AS stock_on_hand,
+           i.reorder_threshold                      AS reorder_threshold,
+           i.reorder_threshold - i.stock_on_hand    AS shortage_amount
+    ORDER BY shortage_amount DESC
+
+- name: VipOrders
+  description: >-
+    Recent completed orders from customers in one loyalty tier, newest first, with the
+    customer's display name and the net order value.
+  params:
+    tier:
+      type: string
+      description: "Loyalty tier: 'GOLD' or 'SILVER'."
+      default: "GOLD"
+  cypher: |
+    MATCH (:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)-[:HAS_ORDER]->(o:ChaiOrder)-[:PLACED_BY]->(c:ChaiCustomer)
+    WHERE o.status = 'COMPLETED' AND c.loyalty_tier = toUpper($tier)
+    RETURN o.order_id                                                AS order_id,
+           s.store_id                                                AS store_id,
+           s.store_name                                              AS store_name,
+           c.display_name                                            AS customer_display_name,
+           c.loyalty_tier                                            AS loyalty_tier,
+           round(100.0 * (o.gross_amount_usd - o.discount_usd)) / 100.0 AS net_order_usd,
+           o.order_timestamp                                         AS order_timestamp
+    ORDER BY order_timestamp DESC
+    LIMIT 25
+
+- name: DelayedSupplierImpact
+  description: >-
+    For suppliers with a given shipment status: the low-stock lines they supply, at which
+    stores, and how many distinct GOLD or SILVER customers have completed orders at each of
+    those stores.
+  params:
+    shipmentStatus:
+      type: string
+      description: "ON_TIME or DELAYED_MONSOON_FREIGHT."
+      default: "DELAYED_MONSOON_FREIGHT"
+  cypher: |
+    MATCH (:ChaiFranchise {by:'supplier_id'})-[:SUPPLIER]->(sup:ChaiSupplier)-[:SUPPLIES]->(i:ChaiInventoryItem)-[:AT_STORE]->(s:ChaiStore)
+    WHERE sup.shipment_status = $shipmentStatus
+      AND i.stock_on_hand <= i.reorder_threshold
+    OPTIONAL MATCH (s)-[:HAS_ORDER]->(o:ChaiOrder)-[:PLACED_BY]->(c:ChaiCustomer)
+    WHERE o.status = 'COMPLETED' AND c.loyalty_tier IN ['GOLD', 'SILVER']
+    RETURN sup.supplier_name            AS supplier_name,
+           sup.shipment_status          AS shipment_status,
+           i.item_name                  AS item_name,
+           s.store_name                 AS store_name,
+           s.city                       AS city,
+           i.stock_on_hand              AS stock_on_hand,
+           i.reorder_threshold          AS reorder_threshold,
+           count(DISTINCT c.customer_id) AS affected_vip_customers
+    ORDER BY affected_vip_customers DESC
