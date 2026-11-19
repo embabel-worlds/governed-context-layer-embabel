@@ -110,6 +110,8 @@ Write-Host "Rendered $out"
 Write-Host "Wrote sessions\agent, sessions\setup and sessions\agent-no-kc"
 Write-Host ''
 Write-Host 'Cloud SQL Auth Proxy (README step 3):'
-Write-Host "  cloud-sql-proxy --port $($values.CHAI_PROXY_PORT) $($values.CHAI_PROJECT_ID):$($values.CHAI_REGION):$($values.CHAI_INSTANCE)"
+Write-Host "  .\cloud-sql-proxy.x64.exe --port $($values.CHAI_PROXY_PORT) $($values.CHAI_PROJECT_ID):$($values.CHAI_REGION):$($values.CHAI_INSTANCE)"
 Write-Host 'Link the realm folder (README step 6):'
 Write-Host "  embabel realms link `"$realms`""
+Write-Host 'Franchise pulse app, once the realm is installed (sign in to the console as its owner):'
+Write-Host "  $(([Uri]$mcpUrl).GetLeftPart([UriPartial]::Authority))/apps/chai/franchise-pulse.html"

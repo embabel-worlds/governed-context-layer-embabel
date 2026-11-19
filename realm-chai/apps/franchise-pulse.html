@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chai &amp; Co. Franchise Pulse</title>
+<style>
+/* Brick's design tokens, copied by value as the platform's own realm apps do, so the page matches
+   the console and loads nothing. --color-warn is this page's own. */
+:root {
+  color-scheme: dark;
+  --color-ground: #131313;
+  --color-surface: #1d1d1d;
+  --color-raised: #252525;
+  --color-line: #2c2c2c;
+  --color-line-strong: #444444;
+  --color-ink: #f4f4f4;
+  --color-ink-muted: #a8a8a8;
+  --color-ink-faint: #8a8a8a;
+  --color-go: #74c69d;
+  --color-abort: #ef6b5b;
+  --color-warn: #e6b450;
+  --font-ui: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  --text-label: 0.75rem;
+  --text-caption: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-title: 1rem;
+  --text-figure: 1.5rem;
+  --radius-sm: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--color-ground); color: var(--color-ink); font: var(--text-body)/1.45 var(--font-ui); }
+.page { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); }
+h1 { margin: 0 0 var(--space-1); font-size: var(--text-title); font-weight: 600; }
+h2 { margin: 0; font-size: var(--text-label); font-weight: 600; color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+code { font: var(--text-caption) var(--font-mono); }
+.note { margin: 0; color: var(--color-ink-muted); font-size: var(--text-caption); }
+.top { display: flex; gap: var(--space-4); justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.top .lede { max-width: 640px; }
+.actions { display: flex; gap: var(--space-3); align-items: center; }
+button, select { padding: var(--space-1) var(--space-3); background: var(--color-raised); color: var(--color-ink); border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm); font: inherit; }
+button { cursor: pointer; }
+button:disabled { color: var(--color-ink-faint); cursor: default; }
+button:focus-visible, select:focus-visible { outline: 1px solid var(--color-ink-muted); outline-offset: 1px; }
+label { display: inline-flex; gap: var(--space-2); align-items: center; color: var(--color-ink-muted); font-size: var(--text-caption); }
+
+.banner { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-abort); border-left-width: 3px; background: var(--color-surface); border-radius: var(--radius-sm); }
+.banner ul { margin: var(--space-2) 0; padding-left: var(--space-4); }
+.banner p { margin: 0; color: var(--color-ink-muted); font-size: var(--text-caption); }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-5); }
+.kpi { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-sm); min-width: 0; }
+.kpi-label { color: var(--color-ink-muted); font-size: var(--text-label); text-transform: uppercase; letter-spacing: 0.08em; }
+.kpi-value { font-size: var(--text-figure); font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi-sub { color: var(--color-ink-faint); font-size: var(--text-caption); min-height: 1.45em; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-top: var(--space-3); }
+.card { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: var(--space-4); min-width: 0; }
+.card.wide { grid-column: 1 / -1; }
+.card-head { display: flex; gap: var(--space-3); justify-content: space-between; align-items: center; flex-wrap: wrap; min-height: 28px; }
+.source { margin: var(--space-1) 0 var(--space-3); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: var(--space-2) var(--space-2); text-align: left; border-bottom: 1px solid var(--color-line); vertical-align: top; }
+td.num, th.num, td.nowrap { white-space: nowrap; }
+th { color: var(--color-ink-muted); font-size: var(--text-label); font-weight: 600; }
+th:first-child, td:first-child { padding-left: 0; }
+td.num, th.num { text-align: right; }
+td .sub { display: block; color: var(--color-ink-faint); font-size: var(--text-label); }
+.state { margin: var(--space-3) 0 0; color: var(--color-ink-muted); font-size: var(--text-caption); }
+.state.bad { color: var(--color-abort); }
+.short { color: var(--color-warn); font-weight: 600; }
+.badge { display: inline-block; padding: 0 var(--space-2); border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm); font-size: var(--text-label); letter-spacing: 0.04em; }
+.badge.gold { border-color: var(--color-warn); color: var(--color-warn); }
+.badge.delayed { border-color: var(--color-abort); color: var(--color-abort); }
+.badge.ontime { border-color: var(--color-go); color: var(--color-go); }
+.target { display: flex; gap: var(--space-2); align-items: center; }
+.bar { position: relative; flex: none; width: 96px; height: 6px; background: var(--color-raised); border-radius: var(--radius-sm); overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--color-ink-muted); }
+.bar .fill.met { background: var(--color-go); }
+.target-text { color: var(--color-ink-muted); font-size: var(--text-caption); }
+.kept { margin: var(--space-3) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--color-line); color: var(--color-ink-muted); font-size: var(--text-caption); }
+
+details summary { cursor: pointer; color: var(--color-ink-muted); }
+details ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); font: var(--text-label) var(--font-mono); color: var(--color-ink-muted); white-space: normal; }
+.warn { color: var(--color-abort); white-space: normal; }
+footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: var(--text-caption); }
+
+/* Two cards side by side only where their tables fit without scrolling. */
+@media (min-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="lede">
+      <h1>Chai &amp; Co. · Morning Franchise Pulse</h1>
+      <p class="note">Every figure comes from one of the <code>chai</code> realm's saved views, run live
+        against Cloud SQL as the read-only <code>chai_reader</code> role. This page names the views; it
+        holds no queries and no credentials.</p>
+    </div>
+    <div class="actions">
+      <span id="updated" class="note"></span>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <section class="kpis" aria-label="Summary">
+    <div class="kpi"><span class="kpi-label">Net store revenue</span><span class="kpi-value" id="kpi-net">—</span><span class="kpi-sub" id="kpi-net-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Orders counted</span><span class="kpi-value" id="kpi-orders">—</span><span class="kpi-sub" id="kpi-orders-sub"></span></div>
+    <div class="kpi"><span class="kpi-label">Low-stock lines</span><span class="kpi-value" id="kpi-low">—</span><span class="kpi-sub" id="kpi-low-sub"></span></div>
+    <div class="kpi"><span class="kpi-label" id="kpi-supply-label">Low stock, delayed suppliers</span><span class="kpi-value" id="kpi-supply">—</span><span class="kpi-sub" id="kpi-supply-sub"></span></div>
+  </section>
+
+  <main class="grid">
+    <section class="card wide" id="revenue" aria-labelledby="revenue-title">
+      <div class="card-head">
+        <h2 id="revenue-title">Store net revenue</h2>
+        <label>City
+          <select id="city">
+            <option value="ALL">All cities</option>
+            <option value="Mumbai">Mumbai</option>
+            <option value="Bengaluru">Bengaluru</option>
+            <option value="Delhi">Delhi</option>
+          </select>
+        </label>
+      </div>
+      <p class="source">View <code>StoreNetRevenue</code>. The revenue rule is the one in Knowledge Catalog, on the <code>orders</code> entry.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Store</th><th>City</th><th class="num">Net revenue</th><th>Against daily target</th><th class="num">Completed</th><th class="num">Excluded</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="state" hidden></p>
+    </section>
+
+    <section class="card" id="lowstock" aria-labelledby="lowstock-title">
+      <div class="card-head"><h2 id="lowstock-title">Tea and spice stock to reorder</h2></div>
+      <p class="source">View <code>LowStockAlerts</code>: lines at or below their reorder threshold.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Store</th><th class="num">On hand</th><th class="num">Reorder at</th><th class="num">Short by</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="state" hidden></p>
+      <p class="kept">Wholesale costs stay in the database: the realm reads stock through a view without them.</p>
+    </section>
+
+    <section class="card" id="vip" aria-labelledby="vip-title">
+      <div class="card-head">
+        <h2 id="vip-title">Recent loyalty orders</h2>
+        <label>Tier
+          <select id="tier">
+            <option value="GOLD">Gold</option>
+            <option value="SILVER">Silver</option>
+          </select>
+        </label>
+      </div>
+      <p class="source">View <code>VipOrders</code>: completed orders, newest first, in store time.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Store</th><th class="num">Net</th><th>Placed</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="state" hidden></p>
+      <p class="kept">Delivery notes, emails, phone numbers and addresses stay in the database: the realm exposes none of them and <code>chai_reader</code> has no grant on them.</p>
+    </section>
+
+    <section class="card wide" id="supply" aria-labelledby="supply-title">
+      <div class="card-head">
+        <h2 id="supply-title">Supply-chain blast radius</h2>
+        <label>Shipments
+          <select id="shipment">
+            <option value="DELAYED_MONSOON_FREIGHT">Delayed (monsoon freight)</option>
+            <option value="ON_TIME">On time</option>
+          </select>
+        </label>
+      </div>
+      <p class="source">View <code>DelayedSupplierImpact</code>: supplier, to the low-stock lines it supplies, to the stores holding them, to the Gold and Silver customers who order there. Four hops in one graph query.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Supplier</th><th>Shipment</th><th>Item</th><th>Store</th><th class="num">On hand</th><th class="num">Reorder at</th><th class="num">Loyalty customers</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="state" hidden></p>
+    </section>
+
+    <section class="card wide" id="trail" aria-labelledby="trail-title">
+      <div class="card-head"><h2 id="trail-title">What ran</h2></div>
+      <p class="source">Every view this page ran, newest first, with the reads the appliance made for it. Zero reads means the answer came from the 60-second cache.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>View</th><th>Arguments</th><th class="num">Rows</th><th class="num">Database reads</th><th class="num">ms</th><th>Producer calls</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="state">Nothing has run yet.</p>
+    </section>
+  </main>
+
+  <footer>
+    Cloud SQL instance <code>${CHAI_INSTANCE}</code> in <code>${CHAI_REGION}</code>, project
+    <code>${CHAI_PROJECT_ID}</code>, read through the <code>chai</code> realm's governed producers.
+    Business rules: Google Cloud Knowledge Catalog. Figures can be up to 60 seconds old.
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // The appliance's saved-view API, on the same origin as this page. It needs the console's
+  // signed-in session and the owner (admin) role. The appliance refuses an admin POST that
+  // carries a session cookie but no X-Requested-With header (a cross-site form could send
+  // the cookie, but not a custom header), so every call sends one.
+  var API = '/api/v1/admin/kg/views/';
+  var TRAIL_MAX = 30;
+
+  var usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+  var storeTime = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  });
+  var clock = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  var STATUS = { DELAYED_MONSOON_FREIGHT: 'Delayed', ON_TIME: 'On time' };
+
+  function byId(id) { return document.getElementById(id); }
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  // Columns the realm declares without a type arrive as text, so every figure is parsed here.
+  function num(v) {
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    return isFinite(n) ? n : null;
+  }
+  function money(v) { var n = num(v); return n === null ? '—' : usd.format(n); }
+  function qty(v, unit) {
+    var n = num(v);
+    if (n === null) return '—';
+    return String(Math.round(n * 100) / 100) + (unit ? ' ' + unit : '');
+  }
+
+  // Order times come back in UTC, often without a zone. The stores are in India, so they are shown
+  // in India Standard Time.
+  function inStoreTime(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    var d;
+    if (Array.isArray(v)) {
+      d = new Date(Date.UTC(v[0], (v[1] || 1) - 1, v[2] || 1, v[3] || 0, v[4] || 0, v[5] || 0));
+    } else {
+      var s = String(v);
+      if (/^\d{4}-\d\d-\d\d[T ]\d\d:\d\d(:\d\d(\.\d+)?)?$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+      d = new Date(s);
+    }
+    return isNaN(d.getTime()) ? String(v) : storeTime.format(d) + ' IST';
+  }
+
+  function withSub(main, sub) {
+    var frag = document.createDocumentFragment();
+    frag.append(document.createTextNode(main === null || main === undefined ? '—' : String(main)));
+    if (sub) frag.append(el('span', 'sub', sub));
+    return frag;
+  }
+
+  // ── Calling the appliance ─────────────────────────────────────────────────────────────────
+
+  var problems = {};
+  var trail = [];
+
+  function failure(message) { var e = new Error(message); e.shown = true; return e; }
+
+  // Runs one saved view. Resolves to its rows; a producer that could not read arrives as a
+  // warning, which goes to the banner, so an empty table is never silently an outage.
+  function runView(name, args) {
+    var started = performance.now();
+    return fetch(API + encodeURIComponent(name) + '/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ args: args }),
+    }).then(function (response) {
+      if (response.status === 401) throw failure('Signed out. Sign in to the Embabel console, then reload this page.');
+      return response.text().then(function (text) {
+        var body = null;
+        try { body = text ? JSON.parse(text) : null; } catch (ignored) { body = null; }
+        // The appliance's own reason first: a 403 is not always a missing role.
+        var reason = body && (body.message || body.error);
+        if (response.status === 403) {
+          throw failure('The appliance refused the view' + (reason ? ': ' + reason : '') +
+            '. Running saved views needs the console owner (admin) role.');
+        }
+        if (!response.ok) throw failure(reason || ('The appliance answered ' + response.status + '.'));
+        if (!body) throw failure('The appliance sent an empty answer.');
+        return body;
+      });
+    }, function () {
+      throw failure('The appliance did not answer. Is it running?');
+    }).then(function (body) {
+      var warnings = (Array.isArray(body.warnings) ? body.warnings : []).map(String);
+      if (body.error) warnings.unshift(String(body.error));
+      record(name, args, body, warnings, performance.now() - started);
+      setProblem(name, warnings[0] || null);
+      // An empty answer that came with a warning is an outage, not an empty table.
+      return { rows: Array.isArray(body.rows) ? body.rows : [], failed: warnings.length > 0 };
+    }, function (e) {
+      record(name, args, null, [e.message], performance.now() - started);
+      setProblem(name, e.message);
+      throw e;
+    });
+  }
+
+  function setProblem(view, message) {
+    if (message) problems[view] = message; else delete problems[view];
+    var banner = byId('banner');
+    var views = Object.keys(problems);
+    banner.replaceChildren();
+    banner.hidden = views.length === 0;
+    if (banner.hidden) return;
+    banner.append(el('strong', null, 'Some figures may be missing or incomplete.'));
+    var list = el('ul');
+    views.forEach(function (v) {
+      var item = el('li');
+      item.append(el('code', null, v), document.createTextNode(': ' + problems[v]));
+      list.append(item);
+    });
+    banner.append(list, el('p', null,
+      'A read that did not execute usually means the Cloud SQL Auth Proxy is not running, or its Google sign-in has expired.'));
+  }
+
+  // ── Drawing ───────────────────────────────────────────────────────────────────────────────
+
+  function section(id) {
+    var root = byId(id);
+    return { tbody: root.querySelector('tbody'), state: root.querySelector('.state') };
+  }
+
+  function loading(id) {
+    var s = section(id);
+    s.state.textContent = 'Reading…';
+    s.state.className = 'state';
+    s.state.hidden = false;
+  }
+
+  function fill(id, rows, columns, emptyText) {
+    var s = section(id);
+    s.tbody.replaceChildren();
+    rows.forEach(function (row) {
+      var tr = el('tr');
+      columns.forEach(function (column) {
+        var td = el('td', column.num ? 'num' : column.cls || '');
+        var value = column.cell(row);
+        if (value instanceof Node) td.append(value); else td.textContent = value === null || value === undefined ? '—' : String(value);
+        tr.append(td);
+      });
+      s.tbody.append(tr);
+    });
+    s.state.className = 'state';
+    s.state.textContent = emptyText;
+    s.state.hidden = rows.length !== 0;
+  }
+
+  function failed(id, kpis) {
+    return function (e) {
+      var s = section(id);
+      s.tbody.replaceChildren();
+      s.state.textContent = e.message;
+      s.state.className = 'state bad';
+      s.state.hidden = false;
+      (kpis || []).forEach(function (k) { kpi(k, '—', ''); });
+    };
+  }
+
+  function kpi(key, value, sub) {
+    byId('kpi-' + key).textContent = value;
+    byId('kpi-' + key + '-sub').textContent = sub || '';
+  }
+
+  function emptyOr(result, text) { return result.failed ? 'No answer: see the note at the top.' : text; }
+
+  function badge(text, cls) { return el('span', 'badge ' + (cls || ''), text); }
+
+  function againstTarget(row) {
+    var net = num(row.net_revenue_usd);
+    var target = num(row.daily_target_usd);
+    var wrap = el('span', 'target');
+    if (net === null || !target) { wrap.textContent = target ? money(target) : '—'; return wrap; }
+    var pct = Math.round((100 * net) / target);
+    var bar = el('span', 'bar');
+    var part = el('span', pct >= 100 ? 'fill met' : 'fill');
+    part.style.width = Math.min(100, Math.max(0, pct)) + '%';
+    bar.append(part);
+    bar.setAttribute('aria-hidden', 'true');
+    wrap.append(bar, el('span', 'target-text', pct + '% of ' + money(target)));
+    return wrap;
+  }
+
+  // ── The four views ────────────────────────────────────────────────────────────────────────
+
+  function loadRevenue() {
+    var city = byId('city').value;
+    loading('revenue');
+    return runView('StoreNetRevenue', { city: city }).then(function (result) {
+      var rows = result.rows;
+      fill('revenue', rows, [
+        { cell: function (r) { return withSub(r.store_name, r.store_id); } },
+        { cell: function (r) { return r.city; } },
+        { num: true, cell: function (r) { return money(r.net_revenue_usd); } },
+        { cls: 'nowrap', cell: againstTarget },
+        { num: true, cell: function (r) { return qty(r.completed_orders); } },
+        { num: true, cell: function (r) { return qty(r.excluded_orders); } },
+      ], emptyOr(result, 'No stores in this city.'));
+      var net = 0, completed = 0, excluded = 0;
+      rows.forEach(function (r) {
+        net += num(r.net_revenue_usd) || 0;
+        completed += num(r.completed_orders) || 0;
+        excluded += num(r.excluded_orders) || 0;
+      });
+      var where = city === 'ALL' ? rows.length + (rows.length === 1 ? ' store' : ' stores') : city;
+      kpi('net', rows.length ? usd.format(net) : '—', rows.length ? where + ', summed from the view' : '');
+      kpi('orders', rows.length ? String(completed) : '—', rows.length ? excluded + ' excluded by the rule' : '');
+    }, failed('revenue', ['net', 'orders']));
+  }
+
+  function loadLowStock() {
+    loading('lowstock');
+    return runView('LowStockAlerts', { storeId: 'ALL' }).then(function (result) {
+      var rows = result.rows;
+      fill('lowstock', rows, [
+        { cell: function (r) { return withSub(r.item_name, r.sku_id); } },
+        { cell: function (r) { return withSub(r.store_name, r.city); } },
+        { num: true, cell: function (r) { return qty(r.stock_on_hand, r.unit); } },
+        { num: true, cell: function (r) { return qty(r.reorder_threshold, r.unit); } },
+        { num: true, cell: function (r) { return el('span', 'short', qty(r.shortage_amount, r.unit)); } },
+      ], emptyOr(result, 'Nothing is at or below its reorder threshold.'));
+      var stores = {};
+      rows.forEach(function (r) { stores[r.store_id || r.store_name] = true; });
+      var n = Object.keys(stores).length;
+      kpi('low', String(rows.length), rows.length ? 'at ' + n + (n === 1 ? ' store' : ' stores') : 'nothing to reorder');
+    }, failed('lowstock', ['low']));
+  }
+
+  function loadVip() {
+    var tier = byId('tier').value;
+    loading('vip');
+    return runView('VipOrders', { tier: tier }).then(function (result) {
+      fill('vip', result.rows, [
+        { cell: function (r) { return el('code', null, r.order_id); } },
+        { cell: function (r) {
+          var frag = document.createDocumentFragment();
+          frag.append(document.createTextNode((r.customer_display_name || '—') + ' '));
+          frag.append(badge(r.loyalty_tier, String(r.loyalty_tier).toUpperCase() === 'GOLD' ? 'gold' : ''));
+          return frag;
+        } },
+        { cell: function (r) { return r.store_name; } },
+        { num: true, cell: function (r) { return money(r.net_order_usd); } },
+        { cls: 'nowrap', cell: function (r) { return inStoreTime(r.order_timestamp); } },
+      ], emptyOr(result, 'No completed orders in this tier.'));
+    }, failed('vip'));
+  }
+
+  function loadSupply() {
+    var status = byId('shipment').value;
+    byId('kpi-supply-label').textContent = status === 'ON_TIME' ? 'Low stock, on-time suppliers' : 'Low stock, delayed suppliers';
+    loading('supply');
+    return runView('DelayedSupplierImpact', { shipmentStatus: status }).then(function (result) {
+      var rows = result.rows;
+      fill('supply', rows, [
+        { cell: function (r) { return r.supplier_name; } },
+        { cell: function (r) { return badge(STATUS[r.shipment_status] || r.shipment_status, r.shipment_status === 'ON_TIME' ? 'ontime' : 'delayed'); } },
+        { cell: function (r) { return r.item_name; } },
+        { cell: function (r) { return withSub(r.store_name, r.city); } },
+        { num: true, cell: function (r) { return qty(r.stock_on_hand); } },
+        { num: true, cell: function (r) { return qty(r.reorder_threshold); } },
+        { num: true, cell: function (r) { return qty(r.affected_vip_customers); } },
+      ], emptyOr(result, 'No low-stock lines from suppliers with this status.'));
+      var stores = {};
+      rows.forEach(function (r) { stores[r.store_name] = true; });
+      var n = Object.keys(stores).length;
+      kpi('supply', String(rows.length), rows.length ? 'at ' + n + (n === 1 ? ' store' : ' stores') : 'none');
+    }, failed('supply', ['supply']));
+  }
+
+  // ── What ran ──────────────────────────────────────────────────────────────────────────────
+
+  function record(view, args, body, warnings, elapsed) {
+    trail.unshift({
+      at: new Date(),
+      view: view,
+      args: args,
+      rows: body && Array.isArray(body.rows) ? body.rows.length : null,
+      reads: body ? num(body.apiCalls) : null,
+      ms: body && num(body.durationMs) !== null ? num(body.durationMs) : Math.round(elapsed),
+      calls: body && Array.isArray(body.apiCallLog) ? body.apiCallLog.map(String) : [],
+      warnings: warnings,
+    });
+    if (trail.length > TRAIL_MAX) trail.length = TRAIL_MAX;
+    drawTrail();
+  }
+
+  function drawTrail() {
+    fill('trail', trail, [
+      { cell: function (t) { return clock.format(t.at); } },
+      { cell: function (t) { return el('code', null, t.view); } },
+      { cell: function (t) {
+        return Object.keys(t.args).map(function (k) { return k + ' = ' + t.args[k]; }).join(', ') || '—';
+      } },
+      { num: true, cell: function (t) { return t.rows === null ? '—' : t.rows; } },
+      { num: true, cell: function (t) { return t.reads === null ? '—' : t.reads; } },
+      { num: true, cell: function (t) { return t.ms === null ? '—' : t.ms; } },
+      { cell: function (t) {
+        var frag = document.createDocumentFragment();
+        if (t.calls.length) {
+          var details = el('details');
+          details.append(el('summary', null, t.calls.length + (t.calls.length === 1 ? ' call' : ' calls')));
+          var list = el('ul');
+          t.calls.forEach(function (c) { list.append(el('li', null, c)); });
+          details.append(list);
+          frag.append(details);
+        } else {
+          frag.append(document.createTextNode('—'));
+        }
+        t.warnings.forEach(function (w) { frag.append(el('div', 'warn', w)); });
+        return frag;
+      } },
+    ], 'Nothing has run yet.');
+  }
+
+  // ── Wiring ────────────────────────────────────────────────────────────────────────────────
+
+  function stamp() { byId('updated').textContent = 'Read at ' + clock.format(new Date()) + ' IST'; }
+
+  function loadAll() {
+    var button = byId('refresh');
+    button.disabled = true;
+    return Promise.allSettled([loadRevenue(), loadLowStock(), loadVip(), loadSupply()]).then(function () {
+      button.disabled = false;
+      stamp();
+    });
+  }
+
+  byId('refresh').addEventListener('click', loadAll);
+  byId('city').addEventListener('change', function () { loadRevenue().finally(stamp); });
+  byId('tier').addEventListener('change', function () { loadVip().finally(stamp); });
+  byId('shipment').addEventListener('change', function () { loadSupply().finally(stamp); });
+
+  loadAll();
+})();
+</script>
+</body>
+</html>

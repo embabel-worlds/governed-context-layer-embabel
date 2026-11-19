@@ -27,6 +27,14 @@ Joins: `(:ChaiFranchise {by:'store_id'})-[:STORE]->(s:ChaiStore)`,
 `StoreNetRevenue` (parameter `city`), `LowStockAlerts` (`storeId`), `VipOrders` (`tier`),
 `DelayedSupplierImpact` (`shipmentStatus`). Every parameter has a default.
 
+## App
+
+`apps/franchise-pulse.html` is the Morning Franchise Pulse: store net revenue, stock to reorder,
+recent loyalty orders and the supply-chain blast radius on one page. The appliance serves it at
+`/apps/chai/franchise-pulse.html`. It runs the four saved views through the appliance's view API
+with the signed-in owner's session, and holds no queries and no credentials. When a producer
+cannot read Cloud SQL, the page shows the warning at the top instead of an empty table.
+
 ## Business rules
 
 The rules for this data (how Net Store Revenue is calculated, which customer columns are

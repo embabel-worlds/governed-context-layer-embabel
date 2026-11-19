@@ -19,6 +19,7 @@ What the port changes:
 | `supplier_cost_usd` left out of one query | `store_inventory` database view; no grant on `tea_inventory` |
 | `delivery_note` returned by the "masked" tool | not exposed, not granted |
 | 3 fixed tools | 4 saved views, plus any Cypher or SQL over the same governed labels |
+| `single_pane_app.py`: a FastAPI server calling the Toolbox tools | `apps/franchise-pulse.html`: a page the appliance serves, running the saved views |
 
 ## What is in this repository
 
@@ -311,6 +312,33 @@ A parameter is set by an equality on its column in `WHERE`. Calling the view as 
 
 See [PROBES.md](PROBES.md). The agent session runs in `sessions/agent`, which has the
 Knowledge Catalog and the appliance.
+
+## The franchise pulse app
+
+The realm ships a one-page dashboard, `realm-chai/apps/franchise-pulse.html`: the port of the
+demo's Morning Franchise Pulse (`single_pane_app.py`). It shows store net revenue with a city
+filter, the stock to reorder, recent Gold or Silver orders in store time (IST), and the
+supply-chain blast radius, with a log of every view it ran and the database reads behind each.
+
+Open it once the realm is installed (step 6), signed in to the appliance console as its owner.
+`configure` prints the address; with the default port it is:
+
+```
+http://localhost:11043/apps/chai/franchise-pulse.html
+```
+
+- **No server of its own.** The appliance serves the page from the realm's `apps/` folder.
+- **No queries or credentials in the page.** It names the four saved views and runs them
+  through the appliance's view API (`POST /api/v1/admin/kg/views/<view>/run`) with the console
+  session; that API needs the owner (admin) role, and the appliance answers 403 to a POST that
+  carries the session cookie without an `X-Requested-With` header, so the page sends one. For
+  Chai & Co. data, any query, from this page
+  or anywhere else, goes through the same governed producers as `chai_reader`, so the boundary
+  does not depend on the page.
+- **Outages show.** When a producer cannot read Cloud SQL, the view answers with a warning,
+  and the page shows it at the top instead of an empty table.
+- **Not ported:** the demo's restock request, which writes to the database. The realm's
+  datasource is read-only.
 
 ## Changing the realm
 
