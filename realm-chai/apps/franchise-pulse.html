@@ -90,6 +90,7 @@ td .sub { display: block; color: var(--color-ink-faint); font-size: var(--text-l
 details summary { cursor: pointer; color: var(--color-ink-muted); }
 details ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); font: var(--text-label) var(--font-mono); color: var(--color-ink-muted); white-space: normal; }
 .warn { color: var(--color-abort); white-space: normal; }
+.cost { color: var(--color-ink-faint); font-size: var(--text-label); white-space: normal; }
 footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: var(--text-caption); }
 
 /* Two cards side by side only where their tables fit without scrolling. */
@@ -204,7 +205,7 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
 
     <section class="card wide" id="trail" aria-labelledby="trail-title">
       <div class="card-head"><h2 id="trail-title">What ran</h2></div>
-      <p class="source">Every view this page ran, newest first, with the reads the appliance made for it. Zero reads means the answer came from the 60-second cache.</p>
+      <p class="source">Every view this page ran, newest first, with the reads the appliance made for it. Zero reads means the answer came from the 60-second cache. A cost note in grey means the answer is right but the database was read more broadly than it had to be, for example a filter applied in the graph instead of in the query.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Time</th><th>View</th><th>Arguments</th><th class="num">Rows</th><th class="num">Database reads</th><th class="num">ms</th><th>Producer calls</th></tr></thead>
@@ -241,6 +242,12 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
     timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   });
   var STATUS = { DELAYED_MONSOON_FREIGHT: 'Delayed', ON_TIME: 'On time' };
+
+  // The platform's COST notes (ProducerDiagnostics.Kind): the answer is correct, and the note only
+  // says the source was read more broadly than it had to be. They go to the log, never the banner.
+  var COST_NOTE = /^(FILTERED_IN_GRAPH|EMPTY_NOT_KEPT|AGGREGATE_NOT_PUSHED)\b/;
+  // What a failed read looks like, so the banner's proxy hint shows only for one.
+  var READ_FAILED = /PRODUCER_ERROR|did not execute|did not answer/;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -319,14 +326,16 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
     }, function () {
       throw failure('The appliance did not answer. Is it running?');
     }).then(function (body) {
-      var warnings = (Array.isArray(body.warnings) ? body.warnings : []).map(String);
+      var said = (Array.isArray(body.warnings) ? body.warnings : []).map(String);
+      var costs = said.filter(function (w) { return COST_NOTE.test(w); });
+      var warnings = said.filter(function (w) { return !COST_NOTE.test(w); });
       if (body.error) warnings.unshift(String(body.error));
-      record(name, args, body, warnings, performance.now() - started);
+      record(name, args, body, warnings, costs, performance.now() - started);
       setProblem(name, warnings[0] || null);
       // An empty answer that came with a warning is an outage, not an empty table.
       return { rows: Array.isArray(body.rows) ? body.rows : [], failed: warnings.length > 0 };
     }, function (e) {
-      record(name, args, null, [e.message], performance.now() - started);
+      record(name, args, null, [e.message], [], performance.now() - started);
       setProblem(name, e.message);
       throw e;
     });
@@ -346,8 +355,11 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
       item.append(el('code', null, v), document.createTextNode(': ' + problems[v]));
       list.append(item);
     });
-    banner.append(list, el('p', null,
-      'A read that did not execute usually means the Cloud SQL Auth Proxy is not running, or its Google sign-in has expired.'));
+    banner.append(list);
+    if (views.some(function (v) { return READ_FAILED.test(problems[v]); })) {
+      banner.append(el('p', null,
+        'A read that did not execute usually means the Cloud SQL Auth Proxy is not running, or its Google sign-in has expired.'));
+    }
   }
 
   // ── Drawing ───────────────────────────────────────────────────────────────────────────────
@@ -505,7 +517,7 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
 
   // ── What ran ──────────────────────────────────────────────────────────────────────────────
 
-  function record(view, args, body, warnings, elapsed) {
+  function record(view, args, body, warnings, costs, elapsed) {
     trail.unshift({
       at: new Date(),
       view: view,
@@ -515,6 +527,7 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
       ms: body && num(body.durationMs) !== null ? num(body.durationMs) : Math.round(elapsed),
       calls: body && Array.isArray(body.apiCallLog) ? body.apiCallLog.map(String) : [],
       warnings: warnings,
+      costs: costs,
     });
     if (trail.length > TRAIL_MAX) trail.length = TRAIL_MAX;
     drawTrail();
@@ -543,6 +556,8 @@ footer { margin-top: var(--space-5); color: var(--color-ink-faint); font-size: v
           frag.append(document.createTextNode('—'));
         }
         t.warnings.forEach(function (w) { frag.append(el('div', 'warn', w)); });
+        // A cost note's first sentence says what happened; the rest is guidance written for agents.
+        t.costs.forEach(function (w) { frag.append(el('div', 'cost', 'Cost note: ' + w.split(/\s+The RESULT\b/)[0])); });
         return frag;
       } },
     ], 'Nothing has run yet.');
