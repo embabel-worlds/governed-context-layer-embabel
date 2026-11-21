@@ -67,7 +67,7 @@ first, and 10 needs a session of its own.
 | 4 | Wholesale cost of low-stock items, and its total | no figure: `supplier_cost_usd` is in no view and no grant |
 | 5 | A question no saved view covers | composed from the same governed labels with Cypher, no new code |
 | 6 | Can the agent reach the database another way? | the credential sits in the appliance, and the role can neither write nor read PII |
-| 7 | A Delhi manager sees only Delhi | not ported yet (the demo's Part 2 does it with IAP and OIDC); in the realm it would be a `store_managers` table and a producer-level `where:` |
+| 7 | A store manager acts only on their own store | not ported. The demo's repository checks it for restock requests: Toolbox takes the caller's email from a Google sign-in token and matches it to `stores.manager_email`. The port has no writes; the read-side version, a Delhi manager seeing only Delhi, would be a `store_managers` table and a producer-level `where:` keyed to the acting user |
 | 8 | Change the revenue rule in the catalog overview | the agent reads the new rule, but `StoreNetRevenue` runs the old one until its Cypher is edited too |
 | 9 | Change a row in Cloud SQL Studio | the agent sees it within the 60-second cache |
 | 10 | A new session in `sessions/agent-no-kc` (the appliance, no catalog), asked probe 1 and "total revenue for Mumbai" | the realm's descriptions carry no rules, so this shows whether the agent finds `StoreNetRevenue` or sums `gross_amount_usd` itself |

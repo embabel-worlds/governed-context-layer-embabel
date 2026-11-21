@@ -14,11 +14,11 @@ What the port changes:
 |---|---|
 | MCP Toolbox connects as `postgres` | `chai_reader`: SELECT on named columns only, read-only by default (`db/setup.sql`) |
 | Knowledge Catalog overviews hold the business rules | **the same catalog**, read by the agent through the same MCP server; the realm's descriptions point to the entries |
-| `tools.yaml`: hand-written SQL statements | `producers/chai.yml`: SELECTs generated from `expose:` lists, `mode: governed` |
-| PII rule as text: "never select email…" | `customer_profiles` database view; no grant on `customers` |
-| `supplier_cost_usd` left out of one query | `store_inventory` database view; no grant on `tea_inventory` |
+| `tools.yaml`: one SQL statement per tool, which the blog has Antigravity generate from the catalog | `producers/chai.yml`: SELECTs generated from `expose:` lists, `mode: governed` |
+| Each tool's SELECT leaves out email, phone and address | `customer_profiles` database view; no grant on `customers`, so no query can select them |
+| `supplier_cost_usd` left out of each query that reads `tea_inventory` | `store_inventory` database view; no grant on `tea_inventory` |
 | `delivery_note` returned by the "masked" tool | not exposed, not granted |
-| 3 fixed tools | 4 saved views, plus any Cypher or SQL over the same governed labels |
+| Fixed tools: 3 in the blog, 5 in the repository's `tools.yaml` (4 reads and the restock write) | 4 saved views for the 4 reads, plus any Cypher or SQL over the same governed labels |
 | `single_pane_app.py`: a FastAPI server calling the Toolbox tools | `apps/franchise-pulse.html`: a page the appliance serves, running the saved views |
 
 ## What is in this repository
